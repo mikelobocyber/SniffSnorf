@@ -4,7 +4,7 @@
 
 Most port scanners tell you *what* is open. SniffSnorf tells you *what it means*.
 
-After scanning, the analyst engine reads the results the way a human analyst would — it fingerprints the host type, flags dangerous exposures in plain English, and maps every finding to a MITRE ATT&CK technique. Drop the output straight into a pentest report.
+After scanning, the analyst engine reads the results the way a human analyst would it fingerprints the host type, flags dangerous exposures in plain English, and maps every finding to a MITRE ATT&CK technique. Drop the output straight into a pentest report.
 
 ```
 sniffsnorf -a 192.168.1.1 -p 1-1024
