@@ -1,0 +1,27 @@
+[package]
+name = "sniffsnorf"
+version = "0.1.0"
+edition = "2021"
+
+# The binary will be invoked as `sniffsnorf` on the command line
+[[bin]]
+name = "sniffsnorf"
+path = "src/main.rs"
+
+[dependencies]
+# tokio is the async runtime — it replaces the standard thread-per-task model.
+# "full" enables all features: TCP, timers, channels, the #[tokio::main] macro, etc.
+tokio = { version = "1", features = ["full"] }
+
+# clap generates our CLI argument parser from a Rust struct using the `derive` feature.
+# No hand-written argument parsing needed.
+clap = { version = "4", features = ["derive"] }
+
+# colored lets us print ANSI color codes to the terminal without manual escape strings.
+colored = "2"
+
+# indicatif draws the progress bar that fills as probes complete.
+indicatif = "0.17"
+
+# futures gives us async combinators (e.g. joining multiple futures at once).
+futures = "0.3"
