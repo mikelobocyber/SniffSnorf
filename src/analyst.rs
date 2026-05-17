@@ -933,3 +933,87 @@ fn wrap_and_indent(text: &str, width: usize, indent: usize) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+
+// ============================================================
+// render_report_plain  (public — called from main.rs for .txt output)
+//
+// Same structure as render_report() but returns a plain String
+// with no ANSI color codes. Used when writing .txt files.
+// ============================================================
+pub fn render_report_plain(report: &HostReport) -> String {
+    let mut out = String::new();
+    let divider = "━".repeat(72);
+
+    out.push('\n');
+    out.push_str(&divider);
+    out.push('\n');
+    out.push_str(&format!(
+        "🐽 SNIFFSNORF ANALYSIS · {}\n",
+        report.host
+    ));
+    out.push_str(&format!(
+        "   Host type: {}\n",
+        report.host_type.description()
+    ));
+    out.push_str(&format!(
+        "   Surface: {} open port{}\n",
+        report.open_ports.len(),
+        if report.open_ports.len() == 1 { "" } else { "s" }
+    ));
+    out.push_str(&divider);
+    out.push('\n');
+
+    out.push_str("\nSUMMARY\n");
+    out.push_str(&wrap_text(&report.summary, 70));
+    out.push('\n');
+
+    if report.findings.is_empty() {
+        out.push_str("\n✓ No notable findings in the scanned range.\n");
+    } else {
+        out.push_str("\nFINDINGS\n");
+
+        for (i, finding) in report.findings.iter().enumerate() {
+            out.push('\n');
+            out.push_str(&format!(
+                "  [{}]  {}  {}\n",
+                i + 1,
+                finding.severity.label(),
+                finding.title
+            ));
+
+            let port_str: Vec<String> = finding.ports.iter().map(|p| p.to_string()).collect();
+            out.push_str(&format!("       Ports:  {}\n", port_str.join(", ")));
+
+            if let Some(mitre) = finding.mitre {
+                out.push_str(&format!("       MITRE:  {mitre}\n"));
+            }
+
+            out.push_str("       Detail:\n");
+            out.push_str(&wrap_and_indent(&finding.detail, 70, 7));
+            out.push('\n');
+        }
+    }
+
+    out.push_str(&divider);
+    out.push('\n');
+
+    let counts = [
+        (Severity::Critical, "critical"),
+        (Severity::High,     "high"),
+        (Severity::Medium,   "medium"),
+        (Severity::Low,      "low"),
+        (Severity::Info,     "info"),
+    ];
+
+    out.push_str("  Findings: ");
+    for (sev, label) in &counts {
+        let n = report.findings.iter().filter(|f| &f.severity == sev).count();
+        if n > 0 {
+            out.push_str(&format!("{n} {label}  "));
+        }
+    }
+    out.push('\n');
+
+    out
+}

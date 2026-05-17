@@ -4,49 +4,10 @@
 
 Most port scanners tell you *what* is open. SniffSnorf tells you *what it means*.
 
-After scanning, the analyst engine reads the results the way a human analyst would it fingerprints the host type, flags dangerous exposures in plain English, and maps every finding to a MITRE ATT&CK technique. Drop the output straight into a pentest report.
+After scanning, the analyst engine reads the results the way a human analyst would — it fingerprints the host type, flags dangerous exposures in plain English, and maps every finding to a MITRE ATT&CK technique. Save the output as a styled HTML report, plain text, or JSON, and open it instantly from the same command.
 
 ```
-sniffsnorf -a 192.168.1.1 -p 1-1024
-```
-
-```
-  ███████╗███╗   ██╗██╗███████╗███████╗███████╗███╗   ██╗ ██████╗ ██████╗ ███████╗
-  ...
-
-🐽 1 host · 1024 ports · 1024 total probes · concurrency 500
-
-  HOST                 PORT    SERVICE            STATE
-  ─────────────────────────────────────────────────────────────────────────────────
-  192.168.1.1          22      ssh                open
-  192.168.1.1          80      http               open
-  192.168.1.1          3306    mysql              open
-  192.168.1.1          6379    redis              open
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🐽 SNIFFSNORF ANALYSIS · 192.168.1.1
-   Host type: web server
-   Surface: 4 open ports
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-SUMMARY
-192.168.1.1 has 4 open ports and appears to be a web server.
-2 high-severity findings present elevated risk.
-
-FINDINGS
-
-  [1]  HIGH  MySQL database port exposed (port 3306)
-       Ports:  3306
-       MITRE:  T1190
-       Detail: MySQL (port 3306) is reachable from the network. Databases
-               should never be directly exposed...
-
-  [2]  HIGH  Redis database port exposed (port 6379)
-       Ports:  6379
-       MITRE:  T1190
-       Detail: Redis has no authentication by default and allows arbitrary
-               data reads, writes, and in some configurations remote code
-               execution via CONFIG SET...
+sniffsnorf -a 192.168.1.1 -o report.html --open
 ```
 
 ---
@@ -54,8 +15,8 @@ FINDINGS
 ## Install
 
 ```bash
-git clone https://github.com/mikelobocyber/sniffsnorf
-cd sniffsnorf
+git clone https://github.com/mikelobocyber/SniffSnorf
+cd SniffSnorf
 cargo build --release
 ./target/release/sniffsnorf --help
 ```
@@ -78,8 +39,10 @@ Options:
   -t, --timeout-ms <MS>       Connect timeout per port in ms [default: 1000]
   -b, --banner                Grab service banners from open ports
   -a, --analyze               Run analyst engine (implies --banner)
-  -j, --json                  Output results as newline-delimited JSON
   -q, --open-only             Only print open ports
+  -j, --json                  Output results as newline-delimited JSON
+  -o, --output <FILE>         Save output to a file (see Output Formats below)
+      --open                  Open the output file after writing (requires -o)
   -h, --help                  Print help
 ```
 
@@ -88,13 +51,13 @@ Options:
 ## Examples
 
 ```bash
-# Basic scan — top 1024 ports
+# Basic scan — top 1024 ports, terminal only
 sniffsnorf 192.168.1.1
 
-# Full analyst report — the main feature
+# Full analyst report in the terminal
 sniffsnorf -a 192.168.1.1
 
-# Analyst on a subnet — reports one host per IP with open ports
+# Analyst on a subnet
 sniffsnorf -a 192.168.1.0/24 -p 22,80,443,3306,5432,6379
 
 # Common attack-surface ports with banners
@@ -105,20 +68,112 @@ sniffsnorf -p 1-65535 -c 2000 -t 500 10.0.0.1
 
 # JSON output for piping to jq
 sniffsnorf -j -p 1-1024 192.168.1.1 | jq 'select(.open == true)'
-
-# JSON with analyst findings (human report to stderr, JSON to stdout)
-sniffsnorf -a -j 192.168.1.1
 ```
 
 ---
 
-## How the analyst works
+## Output Formats
+
+SniffSnorf prints everything to the terminal by default. Nothing is written to disk unless you ask for it with `-o`. The file extension you give determines the format — no extra flags needed.
+
+### HTML report
+
+```bash
+sniffsnorf -a 192.168.1.1 -o report.html
+```
+
+Generates a self-contained single-file HTML report with:
+
+- Dark-themed, browser-ready styling with no external dependencies
+- Summary stats (open ports, hosts analyzed, total findings)
+- Full port table with service and banner columns
+- Per-host analyst sections with severity-color-coded findings
+- Clickable MITRE ATT&CK links that go directly to `attack.mitre.org`
+- Severity summary bar per host (Critical / High / Medium / Low / Info counts)
+
+Open the file by dragging it into any browser, or use `--open` to launch it automatically (see below).
+
+### Plain text
+
+```bash
+sniffsnorf -a 192.168.1.1 -o report.txt
+```
+
+The same report as the terminal output but with no ANSI color codes — clean for attaching to tickets, emails, or paste bins. Includes the port table and the full analyst narrative with MITRE tags.
+
+### JSON
+
+```bash
+sniffsnorf -a 192.168.1.1 -o report.json
+```
+
+Newline-delimited JSON (NDJSON), one object per port result. Same format as `-j` to stdout but written to a file. Pipe-friendly and easy to ingest into SIEM rules, scripts, or Wazuh.
+
+Example line:
+```json
+{"host":"192.168.1.1","port":22,"open":true,"service":"ssh","banner":"SSH-2.0-OpenSSH_9.3","latency_ms":4}
+```
+
+---
+
+## Opening Files Automatically
+
+Add `--open` to any command that writes a file and SniffSnorf will launch it in your default application after saving — browser for HTML, text editor for `.txt`, and so on.
+
+```bash
+# Scan, generate HTML report, open in browser — all in one command
+sniffsnorf -a 192.168.1.1 -o report.html --open
+```
+
+How it works per platform:
+
+| Platform | Command used     |
+|----------|-----------------|
+| Linux    | `xdg-open`      |
+| macOS    | `open`          |
+| Windows  | `cmd /C start`  |
+
+`--open` has no effect without `-o`. If you forget `-o`, SniffSnorf will warn you rather than silently do nothing.
+
+---
+
+## Saving Files — Full Workflow
+
+**No output flag = nothing written to disk.** SniffSnorf only creates files when you explicitly ask. There are no temp files, no auto-generated junk, and no cleanup step.
+
+A typical workflow for a pentest or blue team exercise:
+
+```bash
+# 1. Quick terminal check first — nothing saved
+sniffsnorf -a 192.168.1.1
+
+# 2. Happy with the scan? Save the HTML and open it
+sniffsnorf -a 192.168.1.1 -o 192-168-1-1.html --open
+
+# 3. Also want machine-readable output for your SIEM
+sniffsnorf -a 192.168.1.1 -o 192-168-1-1.json
+
+# 4. Need plain text for a report attachment
+sniffsnorf -a 192.168.1.1 -o 192-168-1-1.txt
+```
+
+Files are written to whatever directory you ran the command from. Use a dedicated folder to keep scans organized:
+
+```bash
+mkdir -p ~/scans/2026-05-16
+cd ~/scans/2026-05-16
+sniffsnorf -a 192.168.1.0/24 -o subnet-scan.html --open
+```
+
+---
+
+## How the Analyst Works
 
 After scanning completes, the analyst engine runs three passes over the results:
 
 **1. Host fingerprinting** (`analyst.rs: fingerprint_host`)
 
-Looks at the *combination* of open ports to decide what kind of host this probably is. A host with ports 445 + 139 + 135 is a Windows machine. A host with 2375 open is a Docker host. A host with 3306 + 5432 + no web ports is a database server. The fingerprint drives the narrative tone.
+Looks at the combination of open ports to decide what kind of host this probably is. A host with ports 445 + 139 + 135 is a Windows machine. A host with 2375 open is a Docker host. A host with 3306 + 5432 + no web ports is a database server. The fingerprint drives the narrative tone.
 
 **2. Finding detection** (`analyst.rs: check_*`)
 
@@ -152,13 +207,23 @@ Inspects the actual text received from open ports. Catches things like outdated 
 
 ```
 src/
-├── main.rs       CLI (clap), orchestration, task spawning, semaphore concurrency
-├── scanner.rs    Async TCP connect, ScanResult struct, port→service name map
+├── main.rs       CLI (clap), orchestration, task spawning, output routing
+├── scanner.rs    Async TCP connect, ScanResult struct, port-to-service name map
 ├── banner.rs     Banner grabbing — passive read or HTTP HEAD probe
-├── cidr.rs       CIDR expansion (IPv4, /16–/32), hostname passthrough
-├── output.rs     Colored table + NDJSON rendering
+├── cidr.rs       CIDR expansion (IPv4, /16-/32), hostname passthrough
+├── output.rs     Terminal table, NDJSON, plain text, and HTML rendering
 └── analyst.rs    Host fingerprinting, finding detectors, narrative engine
 ```
+
+### Output routing
+
+`main.rs` detects the format from the file extension passed to `-o` and routes accordingly:
+
+- `.html` / `.htm` → `output::render_html()` — builds the full self-contained HTML document
+- `.json` → `output::render_json_string()` — NDJSON, same schema as `-j` to stdout
+- `.txt` or no recognized extension → `output::render_table_plain()` + `analyst::render_report_plain()`
+
+The terminal output always runs regardless of `-o`. Writing a file does not suppress the terminal report.
 
 ### Concurrency model
 
@@ -172,7 +237,7 @@ SniffSnorf spawns one `tokio::spawn` task per (host, port) pair immediately. A `
 
 ---
 
-## MITRE ATT&CK mapping
+## MITRE ATT&CK Mapping
 
 SniffSnorf findings map to the following ATT&CK tactics:
 
